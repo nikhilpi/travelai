@@ -1,5 +1,6 @@
 from langchain.utilities import GoogleSearchAPIWrapper
 from langchain.document_loaders import UnstructuredURLLoader
+from supabase_client import supabase
 
 base_locations = [
     "France",
@@ -71,3 +72,25 @@ def download_itinerary(url):
     data = loader.load()
     return data[0]
     
+def save_itinerary(title, url, data):
+    supabase.table("travel_websites").insert({
+        "title": title,
+        "url": url,
+        "page_content": data
+    }).execute()
+
+def run_scrape():
+    for location in base_locations[0:1]:
+        search_results = get_itinerary_urls(location)
+        for result in search_results:
+            print(result)
+            if "link"  in result:
+                supabase_results = supabase.table("travel_websites").select("*").eq("url", result["link"]).execute()
+                if len(supabase_results.data) > 0:
+                    print("Already in database")
+                    continue
+                data = download_itinerary(result["link"])
+                if len(data.page_content) > 100:
+                    save_itinerary(result["title"], result["link"], data.page_content)
+                else:
+                    print("Err No content")
